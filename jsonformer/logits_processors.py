@@ -1,8 +1,10 @@
 from typing import List
-from transformers import PreTrainedTokenizer, LogitsWarper, StoppingCriteria
+from transformers import PreTrainedTokenizer, LogitsProcessor, StoppingCriteria
 import torch
 
+
 class StringStoppingCriteria(StoppingCriteria):
+
     def __init__(self, tokenizer: PreTrainedTokenizer, prompt_length: int):
         self.tokenizer = tokenizer
         self.prompt_length = prompt_length
@@ -16,7 +18,8 @@ class StringStoppingCriteria(StoppingCriteria):
             return False
 
         last_token_id = input_ids[0][-1]
-        last_token = self.tokenizer.decode(last_token_id, skip_special_tokens=True)
+        last_token = self.tokenizer.decode(last_token_id,
+                                           skip_special_tokens=True)
 
         result = '"' in last_token
 
@@ -24,6 +27,7 @@ class StringStoppingCriteria(StoppingCriteria):
 
 
 class NumberStoppingCriteria(StoppingCriteria):
+
     def __init__(
         self,
         tokenizer: PreTrainedTokenizer,
@@ -39,29 +43,25 @@ class NumberStoppingCriteria(StoppingCriteria):
         input_ids: torch.LongTensor,
         scores: torch.FloatTensor,
     ) -> bool:
-        decoded = self.tokenizer.decode(
-            input_ids[0][self.prompt_length :], skip_special_tokens=True
-        )
+        decoded = self.tokenizer.decode(input_ids[0][self.prompt_length:],
+                                        skip_special_tokens=True)
 
         if decoded.count(".") > 1:
             return True
 
-        if (
-            decoded.count(".") == 1
-            and len(decoded.strip().split(".")[1]) > self.precision
-        ):
+        if (decoded.count(".") == 1
+                and len(decoded.strip().split(".")[1]) > self.precision):
             return True
 
-        if (
-            len(decoded) > 1
-            and any(c.isdigit() for c in decoded)
-            and decoded[-1] in [" ", "\n"]
-        ):
+        if (len(decoded) > 1 and any(c.isdigit() for c in decoded)
+                and decoded[-1] in [" ", "\n"]):
             return True
 
         return False
 
-class OutputNumbersTokens(LogitsWarper):
+
+class OutputNumbersTokens(LogitsProcessor):
+
     def __init__(self, tokenizer: PreTrainedTokenizer, prompt: str):
         self.tokenizer = tokenizer
         self.tokenized_prompt = tokenizer(prompt, return_tensors="pt")
@@ -71,10 +71,9 @@ class OutputNumbersTokens(LogitsWarper):
         for _, token_id in tokenizer.get_vocab().items():
             token_str = tokenizer.decode(token_id).strip()
 
-            if token_str == "" or (
-                all(c.isdigit() or c == "." for c in token_str)
-                and token_str.count(".") <= 1
-            ):
+            if token_str == "" or (all(c.isdigit() or c == "."
+                                       for c in token_str)
+                                   and token_str.count(".") <= 1):
                 self.allowed_mask[token_id] = True
 
     def __call__(self, _, scores):
